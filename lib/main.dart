@@ -7,10 +7,12 @@ import 'welcome_screen.dart'; // Agrega esta línea
 import 'home_screen.dart'; // Agrega esta línea
 import 'package:fiesta_finder/login_screen.dart' as login;
 import 'package:fiesta_finder/register_screen.dart' as register;
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await initializeDateFormatting('es_ES', null); // Inicializa para español
   runApp(const FiestaFinderApp());
 }
 

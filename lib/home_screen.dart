@@ -103,17 +103,26 @@ Future<void> _loadUserData() async {
 
     if (mounted) {
       setState(() {
-        favoriteEvents = favoritesSnapshot.docs
-            .map((doc) {
-              final data = doc.data();
-              return {
-                'id': doc.id,
-                'name': data['name'] ?? 'Evento sin nombre',
-                'image': data['image'] ?? '',
-                'fecha': data['fecha'] ?? 'Sin fecha',
-              };
-            })
-            .toList();
+        favoriteEvents = favoritesSnapshot.docs.map((doc) {
+          final data = doc.data();
+
+          final event = {
+            'id': doc.id,
+            'eventName': data['eventName'] ?? 'Sin nombre', // Usa 'eventName'
+            'zona': data['zona'] ?? 'Sin zona',             // Usa 'zona'
+            'image': data['image'] ?? 'assets/default_discotecas.jpg',
+            'name': data['eventName'] ?? '',
+            'localidad': data['direccion'] ?? '',
+            'costo': data['costo'] ?? 0,
+            'fecha': data['fecha'] ?? '',
+            'descripcion': data['descripcion'] ?? '',
+          };
+
+          debugPrint('✅ Evento favorito cargado: $event');
+
+          return event;
+        }).toList();
+
         _loadingFavorites = false;
       });
     }
@@ -125,18 +134,16 @@ Future<void> _loadUserData() async {
   }
 }
 
-Future<void> _setupEventListeners() async {
-  setState(() {
-    _loadingEvents = true;
-    events = [];
-  });
 
+// En HomeScreenState, modifica _setupEventListeners para manejar mejor los eventos
+Future<void> _setupEventListeners() async {
+  if (!mounted) return;
+  
+  setState(() => _loadingEvents = true);
+  
   try {
     Query query;
-    final userId = widget.user.uid;
-
-    debugPrint("🟢 Usuario: $tipoPersona | ID: $userId");
-
+    
     // Filtrado por tipo de usuario
     if (tipoPersona == "Administrador") {
       query = FirebaseFirestore.instance
@@ -144,67 +151,43 @@ Future<void> _setupEventListeners() async {
           .orderBy('fechaTimestamp', descending: true);
     } 
     else if (tipoPersona == "Empresario") {
-      // Verificación explícita de permisos
-      final userDoc = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(userId)
-          .get();
-
-      if (userDoc.data()?['tipoPersona'] != 'Empresario') {
-        throw Exception('El usuario no tiene permisos de empresario');
-      }
-
-      // CONSULTA PRINCIPAL CON MANEJO DE ERRORES
-      try {
-        query = FirebaseFirestore.instance
-    .collection('eventos')
-    .where('creatorId', isEqualTo: widget.user.uid)
-    .where('status', isEqualTo: 'approved') // ✅ Compatible con reglas
-    .orderBy('fechaTimestamp', descending: true);
-
-
-        // Prueba la consulta
-        final testQuery = await query.limit(1).get();
-        debugPrint("✅ Consulta válida. Eventos encontrados: ${testQuery.docs.length}");
-      } catch (e) {
-        debugPrint("🔴 Error en consulta: ${e.toString()}");
-        if (e is FirebaseException && e.code == 'failed-precondition') {
-          debugPrint("Se requiere índice compuesto: ${e.message}");
-          // Consulta alternativa temporal
-          query = FirebaseFirestore.instance
-              .collection('eventos')
-              .where('creatorId', isEqualTo: userId)
-              .orderBy('fechaTimestamp', descending: true);
-        } else {
-          rethrow;
-        }
-      }
+      query = FirebaseFirestore.instance
+          .collection('eventos')
+          .where('creatorId', isEqualTo: widget.user.uid)
+          .orderBy('fechaTimestamp', descending: true);
     }
     else {
+      // Usuario normal solo ve eventos aprobados
       query = FirebaseFirestore.instance
           .collection('eventos')
           .where('status', isEqualTo: 'approved')
           .orderBy('fechaTimestamp', descending: true);
     }
 
-    // Stream de eventos en tiempo real
+    // Limpiar listeners previos para evitar duplicados
     query.snapshots().listen((snapshot) {
       if (!mounted) return;
       
       final newEvents = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>? ?? {};
-        return {
-          'id': doc.id,
-          'name': data['eventName'] ?? 'Evento sin nombre',
-          'image': data['image'] ?? '',
-          'localidad': data['direccion'] ?? 'Ubicación desconocida',
-          'fecha': _formatDate(data['fechaTimestamp'] ?? data['fecha']),
-          'tipo': data['tipo'] ?? 'General',
-          'status': data['status'] ?? 'pending',
-          'creatorId': data['creatorId'] ?? '',
-          'descripcion': data['descripcion'] ?? 'Sin descripción',
-        };
-      }).toList();
+  final data = doc.data() as Map<String, dynamic>;
+  return {
+    'id': doc.id,
+    'name': data['eventName'] ?? 'Evento sin nombre',
+    'image': data['image'] ?? 'assets/eventos/default.jpg', // Imagen predeterminada
+    'localidad': data['zona'] ?? 'Ubicación desconocida',
+    'direccion': data['direccion'] ?? 'Dirección no especificada',
+    'fecha': _formatDate(data['fechaTimestamp'] ?? data['fecha']),
+    'hora': data['hora'] ?? 'Hora no especificada', // Añadir hora
+    'tipo': data['tipo'] ?? 'General',
+    'status': data['status'] ?? 'pending',
+    'creatorId': data['creatorId'] ?? '',
+    'descripcion': data['descripcion'] ?? 'Sin descripción',
+    'costo': data['costo'] ?? 0.0,
+    'esGratis': data['esGratis'] ?? true,
+    'accesibilidad': data['accesibilidad'] ?? false,
+    'parqueadero': data['parqueadero'] ?? false,
+  };
+}).toList();
 
       if (mounted) {
         setState(() {
@@ -214,19 +197,23 @@ Future<void> _setupEventListeners() async {
         });
       }
     }, onError: (e) {
-      debugPrint("Error en stream: ${e.toString()}");
+      debugPrint("Error en listener de eventos: $e");
       if (mounted) {
-        setState(() => _loadingEvents = false);
-        _showErrorSnackBar("Error en tiempo real: ${e.toString()}");
+        setState(() {
+          _loadingEvents = false;
+          events = [];
+          filteredEvents = [];
+        });
+        _showErrorSnackBar("Error al cargar eventos: ${e.toString()}");
       }
     });
 
   } catch (e) {
+    debugPrint("Error en setupEventListeners: $e");
     if (mounted) {
       setState(() => _loadingEvents = false);
-      _showErrorSnackBar("Error al cargar eventos: ${e.toString()}");
+      _showErrorSnackBar("Error al conectar con la base de datos");
     }
-    debugPrint("Error en _setupEventListeners: ${e.toString()}");
   }
 }
 
@@ -273,9 +260,17 @@ Future<void> _setupEventListeners() async {
 
   // Manejar favoritos
   Future<void> _toggleFavorite(Map<String, dynamic> event) async {
+  final userId = widget.user.uid;
+  final eventId = event['id'];
+  
+  if (userId.isEmpty || eventId.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: Usuario o evento no válido')),
+    );
+    return;
+  }
+
   try {
-    final userId = widget.user.uid;
-    final eventId = event['id'];
     final favoritesRef = FirebaseFirestore.instance
         .collection('usuarios')
         .doc(userId)
@@ -285,25 +280,38 @@ Future<void> _setupEventListeners() async {
     
     if (doc.exists) {
       await favoritesRef.doc(eventId).delete();
-      _showSuccessFeedback("Removido de favoritos");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Removido de favoritos')),
+        );
+      }
     } else {
-      final favoriteData = {
-        'id': eventId,
-        'name': event['name'],
+      await favoritesRef.doc(eventId).set({
+        'eventId': eventId,
+        'eventName': event['eventName'],
         'image': event['image'],
         'fecha': event['fecha'],
+        'costo': event['costo'],
+        'esGratis': event['esGratis'],
         'addedAt': FieldValue.serverTimestamp(),
-      };
-      await favoritesRef.doc(eventId).set(favoriteData);
-      _showSuccessFeedback("Agregado a favoritos");
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Agregado a favoritos')),
+        );
+      }
     }
-    
-    // Forzar recarga de favoritos
+
+    // Actualiza la lista de favoritos
     await _loadFavorites();
     
   } catch (e) {
-    _showErrorSnackBar("Error: ${e.toString()}");
-    debugPrint("Error en favoritos: $e");
+    debugPrint('Error en _toggleFavorite: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al actualizar favoritos')),
+      );
+    }
   }
 }
   // Mostrar panel de administración
@@ -723,23 +731,28 @@ Future<void> _rejectEvent(String eventId, String creatorId) async {
           final doc = events[index];
           final data = doc.data() as Map<String, dynamic>;
 
-          final event = {
-            ...data,
-            'id': doc.id,
-            // 🔁 Aquí renombramos para que coincidan con los que usa EventCard
-            'name': data['eventName'],
-            'localidad': data['direccion'],
-            'costo': data.containsKey('costo') ? data['costo'] : null,
-          };
-          debugPrint("📦 Evento construido: ${event.toString()}");
+final event = {
+  ...data,
+  'id': doc.id,
+  // 🔁 Renombrados para que coincidan con los que usa EventCard
+  'eventName': data['eventName'] ?? 'Sin nombre', // Usa 'eventName'
+  'zona': data['zona'] ?? 'Sin zona',             // Usa 'zona'
+  'image': data['image'] ?? 'assets/default_discotecas.jpg',
+  'name': data['eventName'] ?? '',
+  'localidad': data['direccion'] ?? '',
+  'costo': data['costo'] ?? 0,
+  'fecha': data['fecha'] ?? '',
+  'descripcion': data['descripcion'] ?? '',
+};
 
-          debugPrint("📦 Evento final que se envía a EventCard: $event");
+debugPrint("📦 Evento construido: $event");
 
-          return EventCard(
-            event: event,
-            isFavorite: false,
-            onToggleFavorite: (e) {},
-          );
+return EventCard(
+  event: event,
+  isFavorite: false,
+  onToggleFavorite: (e) {},
+);
+
         },
       );
     },
@@ -1243,6 +1256,7 @@ Widget build(BuildContext context) {
     ),
   );
 }
+
 
   @override
   void dispose() {

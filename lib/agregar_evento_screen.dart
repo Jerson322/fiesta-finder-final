@@ -53,6 +53,7 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
   String? _tipoSeleccionado;
   bool _accesibilidad = false;
   bool _parqueadero = false;
+  bool _esGratis = true; // Nuevo campo para evento gratis
 
   File? _imageFile;
   bool _isLoading = false;
@@ -60,6 +61,14 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
   final List<String> _tiposEvento = [
     'Gastrobar', 'Discotecas', 'Cultural', 'Deportivo'
   ];
+
+  // Mapa de imágenes predeterminadas por tipo de evento
+  final Map<String, String> _imagenesPredeterminadas = {
+    'Gastrobar': 'assets/eventos/gastrobar.jpg',
+    'Discotecas': 'assets/default_discotecas.jpg',
+    'Cultural': 'assets/eventos/cultural.jpg',
+    'Deportivo': 'assets/eventos/deportivo.jpg',
+  };
 
   Future<void> _pickImage() async {
     try {
@@ -120,64 +129,62 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
   }
 
   Future<void> _selectLocation() async {
-  final TextEditingController _direccionInputController = TextEditingController();
-  String? errorText;
+    final TextEditingController _direccionInputController = TextEditingController();
+    String? errorText;
 
-  await showDialog<String>(
-    context: context,
-    barrierDismissible: false, // Evita cerrar el diálogo tocando fuera
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('Escribir dirección'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: _direccionInputController,
-                  decoration: InputDecoration(
-                    hintText: 'Ej. Calle 123 #45-67, Bogotá',
-                    errorText: errorText,
+    await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Escribir dirección'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _direccionInputController,
+                    decoration: InputDecoration(
+                      hintText: 'Ej. Calle 123 #45-67, Bogotá',
+                      errorText: errorText,
+                    ),
+                    autofocus: true,
                   ),
-                  autofocus: true,
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final direccion = _direccionInputController.text.trim();
+                    if (direccion.isEmpty) {
+                      setState(() {
+                        errorText = 'Por favor escribe una dirección.';
+                      });
+                    } else {
+                      Navigator.pop(context, direccion);
+                    }
+                  },
+                  child: const Text('Aceptar'),
                 ),
               ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancelar'),
-              ),
-              TextButton(
-                onPressed: () {
-                  final direccion = _direccionInputController.text.trim();
-                  if (direccion.isEmpty) {
-                    setState(() {
-                      errorText = 'Por favor escribe una dirección.';
-                    });
-                  } else {
-                    Navigator.pop(context, direccion);
-                  }
-                },
-                child: const Text('Aceptar'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  ).then((result) {
-    if (result != null && result.isNotEmpty) {
-      setState(() {
-        _direccionController.text = result;
-        _ubicacionEvento = null; // Limpiamos coordenadas si ya no se usan
-      });
-    }
-  });
-}
-
-
+            );
+          },
+        );
+      },
+    ).then((result) {
+      if (result != null && result.isNotEmpty) {
+        setState(() {
+          _direccionController.text = result;
+          _ubicacionEvento = null;
+        });
+      }
+    });
+  }
 
   Future<void> _submitEvent() async {
     if (!_formKey.currentState!.validate()) return;
@@ -201,6 +208,12 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
       return;
     }
 
+    // Validación adicional para costo
+    if (!_esGratis && (_costoController.text.isEmpty || double.tryParse(_costoController.text) == null)) {
+      _showErrorSnackBar('Ingresa un costo válido para el evento');
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -217,6 +230,10 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
       String? imageUrl;
       if (_imageFile != null) {
         imageUrl = await _uploadImage(_imageFile!);
+      } else if (_tipoSeleccionado != null) {
+        // Asignar imagen predeterminada si no se seleccionó una
+        // Nota: En producción necesitarías implementar la carga de assets
+        imageUrl = 'default_${_tipoSeleccionado?.toLowerCase()}.jpg';
       }
 
       Map<String, String> infoPagos = {};
@@ -231,34 +248,54 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
       }
 
       final eventData = {
-        'eventName': _nombreController.text.trim(),
-        'descripcion': _descripcionController.text.trim(),
-        'zona': _zonaSeleccionada,
-        'fecha': DateFormat('dd/MM/yyyy').format(fechaEvento),
-        'fechaTimestamp': Timestamp.fromDate(fechaEvento),
-        'tipo': _tipoSeleccionado,
-        'image': imageUrl ?? 'https://via.placeholder.com/150',
-        'creatorId': widget.user.uid,
-        'createdAt': FieldValue.serverTimestamp(),
-        'status': 'pending',
-        'capacidad': int.tryParse(_capacidadController.text) ?? 0,
-        'costo': double.tryParse(_costoController.text) ?? 0.0,
-        'direccion': _direccionController.text.trim(),
-        'ubicacion': _ubicacionEvento != null 
-            ? GeoPoint(_ubicacionEvento!.latitude, _ubicacionEvento!.longitude)
-            : null,
-        'hora': _horaController.text.trim(),
-        'contacto': _contactoController.text.trim(),
-        'etiquetas': _etiquetasController.text.split(',').map((e) => e.trim()).toList(),
-        'politicas': _politicasController.text.trim(),
-        'accesibilidad': _accesibilidad,
-        'parqueadero': _parqueadero,
-        'mediosPago': _mediosSeleccionados,
-        'infoPagos': infoPagos,
-        'rating': 0,
-        'views': 0,
-      };
+  'eventName': _nombreController.text.trim(),
+  'descripcion': _descripcionController.text.trim(),
+  'zona': _zonaSeleccionada ?? 'No especificada',
+  'fecha': DateFormat('yyyy-MM-dd').format(fechaEvento), // Formato más estándar
+  'fechaTimestamp': Timestamp.fromDate(fechaEvento),
+  'hora': _horaController.text.trim() ?? 'Hora no especificada',
+  'tipo': _tipoSeleccionado ?? 'General',
+  'image': imageUrl ?? 'https://via.placeholder.com/400', // URL pública genérica
+  'creatorId': widget.user.uid,
+  'createdAt': FieldValue.serverTimestamp(),
+  'status': 'pending',
+  'esGratis': _esGratis,
+  'capacidad': _esGratis ? 0 : (int.tryParse(_capacidadController.text) ?? 0),
+  'costo': _esGratis ? 0.0 : (double.tryParse(_costoController.text) ?? 0.0),
+  'direccion': _direccionController.text.trim() ?? 'Dirección no especificada',
+  'ubicacion': _ubicacionEvento != null 
+      ? GeoPoint(_ubicacionEvento!.latitude, _ubicacionEvento!.longitude)
+      : null,
+  'contacto': _contactoController.text.trim(),
+  'etiquetas': _etiquetasController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+  'politicas': _politicasController.text.trim(),
+  'accesibilidad': _accesibilidad,
+  'parqueadero': _parqueadero,
+  'mediosPago': _mediosSeleccionados,
+  'infoPagos': infoPagos,
+  'rating': 0,
+  'views': 0,
+};
+// Antes de guardar, verifica todos los campos requeridos
+final requiredFields = {
+  'Nombre': _nombreController.text.isEmpty,
+  'Descripción': _descripcionController.text.isEmpty,
+  'Zona': _zonaSeleccionada == null,
+  'Tipo': _tipoSeleccionado == null,
+  'Dirección': _direccionController.text.isEmpty,
+  'Fecha': _fechaController.text.isEmpty,
+  'Contacto': _contactoController.text.isEmpty,
+};
 
+final missingField = requiredFields.entries.firstWhere(
+  (entry) => entry.value,
+  orElse: () => MapEntry('', false),
+);
+
+if (missingField.value) {
+  _showErrorSnackBar('${missingField.key} es requerido');
+  return;
+}
       await FirebaseFirestore.instance.collection('eventos').add(eventData);
 
       _showSuccessSnackBar('Evento enviado para aprobación');
@@ -273,7 +310,6 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -472,6 +508,16 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                  if (_tipoSeleccionado != null) ...[
+                    SizedBox(height: 8),
+                    Text(
+                      'Tipo seleccionado: $_tipoSeleccionado',
+                      style: GoogleFonts.poppins(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ],
               ),
       ),
@@ -532,40 +578,42 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
   }
 
   Widget _buildModernTextField({
-    required TextEditingController controller,
-    required String label,
-    IconData? icon,
-    bool readOnly = false,
-    int maxLines = 1,
-    VoidCallback? onTap,
-    TextInputType? keyboardType,
-  }) {
-    return TextFormField(
-      controller: controller,
-      readOnly: readOnly,
-      onTap: onTap,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      style: GoogleFonts.poppins(),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: GoogleFonts.poppins(color: Colors.grey[600]),
-        floatingLabelStyle: GoogleFonts.poppins(color: Color(0xFF6A11CB)),
-        prefixIcon: icon != null ? Icon(icon, color: Color(0xFF6A11CB)) : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Color(0xFF6A11CB), width: 1.5),
-        ),
-        filled: true,
-        fillColor: Colors.grey[50],
+  required TextEditingController controller,
+  required String label,
+  IconData? icon,
+  bool readOnly = false,
+  int maxLines = 1,
+  VoidCallback? onTap,
+  TextInputType? keyboardType,
+  String? Function(String?)? validator, // ✅ nuevo parámetro opcional
+}) {
+  return TextFormField(
+    controller: controller,
+    readOnly: readOnly,
+    onTap: onTap,
+    maxLines: maxLines,
+    keyboardType: keyboardType,
+    style: GoogleFonts.poppins(),
+    decoration: InputDecoration(
+      labelText: label,
+      labelStyle: GoogleFonts.poppins(color: Colors.grey[600]),
+      floatingLabelStyle: GoogleFonts.poppins(color: Color(0xFF6A11CB)),
+      prefixIcon: icon != null ? Icon(icon, color: Color(0xFF6A11CB)) : null,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey[300]!),
       ),
-      validator: (value) => value!.isEmpty ? 'Este campo es obligatorio' : null,
-    );
-  }
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Color(0xFF6A11CB), width: 1.5),
+      ),
+      filled: true,
+      fillColor: Colors.grey[50],
+    ),
+    validator: validator, // ✅ usa el validador externo si se pasa
+  );
+}
+
 
   Widget _buildDetailsSection() {
     return Column(
@@ -628,23 +676,61 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
           ),
         ],
         SizedBox(height: 16),
+        // Nuevo switch para evento gratis
+        _buildModernSwitch(
+          value: _esGratis,
+          onChanged: (val) {
+            setState(() {
+              _esGratis = val;
+              if (val) {
+                _costoController.text = '0';
+              } else {
+                _costoController.text = '';
+              }
+            });
+          },
+          label: 'Evento gratuito',
+          icon: Icons.money_off,
+        ),
+        SizedBox(height: 8),
+        if (_esGratis)
+          Text(
+            'Los eventos gratuitos no requieren especificar capacidad exacta',
+            style: GoogleFonts.poppins(
+              color: Colors.grey[600],
+              fontSize: 12,
+            ),
+          ),
+        SizedBox(height: 8),
         Row(
           children: [
             Expanded(
-              child: _buildModernTextField(
-                controller: _capacidadController,
-                label: 'Capacidad*',
-                icon: Icons.people,
-                keyboardType: TextInputType.number,
+              child: AbsorbPointer(
+                absorbing: _esGratis,
+                child: Opacity(
+                  opacity: _esGratis ? 0.5 : 1.0,
+                  child: _buildModernTextField(
+                    controller: _capacidadController,
+                    label: 'Capacidad*',
+                    icon: Icons.people,
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
               ),
             ),
             SizedBox(width: 16),
             Expanded(
-              child: _buildModernTextField(
-                controller: _costoController,
-                label: 'costo',
-                icon: Icons.attach_money,
-                keyboardType: TextInputType.number,
+              child: AbsorbPointer(
+                absorbing: _esGratis,
+                child: Opacity(
+                  opacity: _esGratis ? 0.5 : 1.0,
+                  child: _buildModernTextField(
+                    controller: _costoController,
+                    label: 'Costo entrada*',
+                    icon: Icons.attach_money,
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
               ),
             ),
           ],
