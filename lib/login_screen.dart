@@ -286,7 +286,7 @@ class LoginScreenState extends State<LoginScreen> {
                           );
                         },
                         child: const Text(
-                          '¿No tienes cuenta? Regístrate',
+                          '¿No tienes cuenta? lloralo Regístrate',
                           style: TextStyle(
                             color: Colors.blue,
                             fontWeight: FontWeight.bold,

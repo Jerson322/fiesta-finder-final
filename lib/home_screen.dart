@@ -170,14 +170,19 @@ Future<void> _setupEventListeners() async {
       
       final newEvents = snapshot.docs.map((doc) {
   final data = doc.data() as Map<String, dynamic>;
+
+  print('Documento ID: ${doc.id}');
+  print('Datos recibidos: $data');
+  print('Nombre del evento: ${data['eventName']}');
+
   return {
     'id': doc.id,
-    'name': data['eventName'] ?? 'Evento sin nombre',
-    'image': data['image'] ?? 'assets/eventos/default.jpg', // Imagen predeterminada
+    'eventName': data['eventName'] ?? 'Evento sin nombre',
+    'image': data['image'] ?? 'assets/eventos/default.jpg',
     'localidad': data['zona'] ?? 'Ubicación desconocida',
     'direccion': data['direccion'] ?? 'Dirección no especificada',
     'fecha': _formatDate(data['fechaTimestamp'] ?? data['fecha']),
-    'hora': data['hora'] ?? 'Hora no especificada', // Añadir hora
+    'hora': data['hora'] ?? 'Hora no especificada',
     'tipo': data['tipo'] ?? 'General',
     'status': data['status'] ?? 'pending',
     'creatorId': data['creatorId'] ?? '',
@@ -188,6 +193,7 @@ Future<void> _setupEventListeners() async {
     'parqueadero': data['parqueadero'] ?? false,
   };
 }).toList();
+
 
       if (mounted) {
         setState(() {
@@ -233,29 +239,29 @@ Future<void> _setupEventListeners() async {
   // Filtrar eventos según búsqueda y filtros
   void _filterEvents() {
   final query = searchController.text.toLowerCase();
-  
+
   setState(() {
     filteredEvents = events.where((event) {
-      final matchesSearch = event["name"]?.toLowerCase().contains(query) ?? false;
+      final matchesSearch = event["eventName"]?.toLowerCase().contains(query) ?? false;
       final matchesLocation = selectedFilter == "Todos" || event["localidad"] == selectedFilter;
       final matchesDate = selectedDate == "Todas" || event["fecha"] == selectedDate;
       final matchesType = selectedType == "Todos" || event["tipo"] == selectedType;
-      
-      // Para Admin/Empresario: ver todos o solo sus eventos
+
       if (tipoPersona == "Administrador") {
         return matchesSearch && matchesLocation && matchesDate && matchesType;
-      }
-      else if (tipoPersona == "Empresario") {
+      } else if (tipoPersona == "Empresario") {
         final isMyEvent = event["creatorId"] == widget.user.uid;
-        return matchesSearch && matchesLocation && matchesDate && matchesType && 
-              (isMyEvent || event["status"] == "approved");
-      }
-      else { // Usuario normal
-        return matchesSearch && matchesLocation && matchesDate && matchesType;
+        return matchesSearch && matchesLocation && matchesDate && matchesType &&
+               (isMyEvent || event["status"] == "approved");
+      } else {
+        // Usuario normal: solo eventos aprobados
+        return event["status"] == "approved" &&
+               matchesSearch && matchesLocation && matchesDate && matchesType;
       }
     }).toList();
   });
 }
+
 
 
   // Manejar favoritos

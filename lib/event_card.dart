@@ -145,124 +145,98 @@ String _getImageUrl() {
   }
 
   @override
-  Widget build(BuildContext context) {
-    debugPrint('\nConstruyendo tarjeta para evento: ${event['id'] ?? 'sin ID'}');
-    debugPrint('Datos completos: $event');
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      elevation: 4,
+Widget build(BuildContext context) {
+  return Card(
+    margin: const EdgeInsets.all(8),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: InkWell( // <-- Añade InkWell aquí
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => _showEventDetails(context), // <-- Llama al método aquí
       child: Stack(
         children: [
-          // Gestor de toques para toda la tarjeta (EXCLUYENDO el botón de favoritos)
-          Positioned.fill(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => _showEventDetails(context),
-                excludeFromSemantics: true,
-              ),
-            ),
-          ),
-          
-          // Contenido principal
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                // Imagen del evento
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Imagen del evento (parte superior)
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
                   child: CachedNetworkImage(
                     imageUrl: _getImageUrl(),
-                    width: 100,
-                    height: 100,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
                       color: Colors.grey[200],
                       child: const Center(child: CircularProgressIndicator()),
                     ),
-                    errorWidget: (context, url, error) {
-                      debugPrint('Error cargando imagen: $error');
-                      return Container(
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.image, size: 40),
-                      );
-                    },
+                    errorWidget: (context, url, error) => Container(
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.image, size: 40),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                // Información del evento
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _getField('eventName', 'Evento sin nombre'),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+              ),
+              // Contenido textual (parte inferior)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getField('eventName', 'Evento sin nombre'),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 8),
-                      _buildInfoRow(Icons.location_on, _getField('zona')),
-                      _buildInfoRow(Icons.calendar_today, _getFormattedDate()),
-                      _buildInfoRow(Icons.access_time, _getField('hora')),
-                      const SizedBox(height: 4),
-                      Text(
-                        _getPrice(),
-                        style: TextStyle(
-                          color: _getPrice() == 'GRATIS' ? Colors.green : Colors.blue,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(Icons.location_on, _getField('zona')),
+                    _buildInfoRow(Icons.calendar_today, _getFormattedDate()),
+                    _buildInfoRow(Icons.access_time, _getField('hora')),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getPrice(),
+                      style: TextStyle(
+                        color: _getPrice() == 'GRATIS' ? Colors.green : Colors.blue,
+                        fontWeight: FontWeight.bold,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          
-          // Botón de favoritos - CON prioridad de gestos
+          // Botón de favoritos
           Positioned(
-            top: 4,
-            right: 4,
+            top: 8,
+            right: 8,
             child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
+              behavior: HitTestBehavior.opaque, // <-- Importante para evitar conflictos
               onTap: () {
                 HapticFeedback.lightImpact();
                 onToggleFavorite(event);
               },
               child: Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.9),
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
                 child: Icon(
                   isFavorite ? Icons.favorite : Icons.favorite_border,
                   color: isFavorite ? Colors.red : Colors.grey[600],
-                  size: 24,
+                  size: 20,
                 ),
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-
+    ),
+  );
+}
   void _showEventDetails(BuildContext context) {
     showDialog(
       context: context,
