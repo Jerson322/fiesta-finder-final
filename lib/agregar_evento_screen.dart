@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'dart:math';
+
 
 class AgregarEventoScreen extends StatefulWidget {
   final User user;
@@ -63,12 +65,29 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
   ];
 
   // Mapa de imágenes predeterminadas por tipo de evento
-  final Map<String, String> _imagenesPredeterminadas = {
-    'Gastrobar': 'assets/eventos/gastrobar.jpg',
-    'Discotecas': 'assets/default_discotecas.jpg',
-    'Cultural': 'assets/eventos/cultural.jpg',
-    'Deportivo': 'assets/eventos/deportivo.jpg',
-  };
+  final Map<String, List<String>> _defaultImages = {
+  'Gastrobar': [
+    'assets/eventos/gastrobar_1.jpg',
+    'assets/eventos/gastrobar_2.jpg',
+    'assets/eventos/gastrobar_3.jpg',
+  ],
+  'Discotecas': [
+    'assets/eventos/discoteca_1.jpg',
+    'assets/eventos/discoteca_2.jpg',
+    'assets/eventos/discoteca_3.jpg',
+  ],
+  'Cultural': [
+    'assets/eventos/cultural_1.jpg',
+    'assets/eventos/cultural_2.jpg',
+    'assets/eventos/cultural_3.jpg',
+  ],
+  'Deportivo': [
+    'assets/eventos/deportivo_1.jpg',
+    'assets/eventos/deportivo_2.jpg',
+    'assets/eventos/deportivo_3.jpg',
+  ],
+};
+
 
   Future<void> _pickImage() async {
     try {
@@ -228,13 +247,16 @@ class _AgregarEventoScreenState extends State<AgregarEventoScreen> {
       }
 
       String? imageUrl;
-      if (_imageFile != null) {
-        imageUrl = await _uploadImage(_imageFile!);
-      } else if (_tipoSeleccionado != null) {
-        // Asignar imagen predeterminada si no se seleccionó una
-        // Nota: En producción necesitarías implementar la carga de assets
-        imageUrl = 'default_${_tipoSeleccionado?.toLowerCase()}.jpg';
-      }
+if (_imageFile != null) {
+  imageUrl = await _uploadImage(_imageFile!);
+} else if (_tipoSeleccionado != null && _defaultImages.containsKey(_tipoSeleccionado)) {
+  final random = Random();
+  final images = _defaultImages[_tipoSeleccionado]!;
+  imageUrl = images[random.nextInt(images.length)];
+} else {
+  imageUrl = 'assets/default.jpg'; // Fallback en caso de error o tipo no reconocido
+}
+
 
       Map<String, String> infoPagos = {};
       if (_mediosSeleccionados.contains('Transferencia bancaria')) {

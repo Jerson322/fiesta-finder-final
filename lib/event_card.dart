@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
+import 'dart:math';
+
 
 class EventCard extends StatelessWidget {
   final Map<String, dynamic> event;
@@ -17,12 +19,28 @@ class EventCard extends StatelessWidget {
   });
 
   // Mapa de imágenes predeterminadas por tipo de evento
-  static const Map<String, String> _defaultImages = {
-    'Gastrobar': 'assets/eventos/gastrobar.jpg',
-    'Discotecas': 'assets/default_discotecas.jpg',
-    'Cultural': 'assets/eventos/cultural.jpg',
-    'Deportivo': 'assets/eventos/deportivo.jpg',
-  };
+  static const Map<String, List<String>> _defaultImages = {
+  'Gastrobar': [
+    'assets/gastrobar_1.jpg',
+    'assets/gastrobar_2.jpg',
+    'assets/gastrobar_3.jpg',
+  ],
+  'Discotecas': [
+    'assets/discoteca_1.jpg',
+    'assets/discoteca_2.jpg',
+    'assets/discoteca_3.jpg',
+  ],
+  'Cultural': [
+    'assets/cultural_1.jpg',
+    'assets/cultural_2.jpg',
+    'assets/cultural_3.jpg',
+  ],
+  'Deportivo': [
+    'assets/deportivo_1.jpg',
+    'assets/deportivo_2.jpg',
+    'assets/deportivo_3.jpg',
+  ],
+};
 
   // 1. Actualiza el método _getField
 String _getField(String key, [String defaultValue = 'No especificado']) {
@@ -53,21 +71,30 @@ String _getField(String key, [String defaultValue = 'No especificado']) {
 
 // 2. Asegura que _getImageUrl() maneje imágenes correctamente
 String _getImageUrl() {
-  // 1. Si es una URL válida
-  if (event['image'] != null && event['image'].toString().startsWith('http')) {
-    return event['image'];
-  }
-  
-  // 2. Si es un asset local (ej: "assets/...")
-  if (event['image'] != null && event['image'].toString().startsWith('assets/')) {
-    return event['image'];
-  }
-  
-  // 3. Imagen predeterminada por tipo de evento
-  final tipoEvento = _getField('tipo');
-  return _defaultImages[tipoEvento] ?? 'assets/default_discotecas.jpg';
-}
+  final image = event['image'];
 
+  // 1. Si es una URL válida
+  if (image != null && image.toString().startsWith('http')) {
+    return image;
+  }
+
+  // 2. Si es un asset local (ej: "assets/...")
+  if (image != null && image.toString().startsWith('assets/')) {
+    return image;
+  }
+
+  // 3. Imagen aleatoria predeterminada por tipo de evento
+  final tipoEvento = _getField('tipo');
+  final defaultList = _defaultImages[tipoEvento];
+
+  if (defaultList != null && defaultList.isNotEmpty) {
+    final random = Random();
+    return defaultList[random.nextInt(defaultList.length)];
+  }
+
+  // 4. Fallback general
+  return 'assets/default_discotecas.jpg';
+}
 
 
   String _getFormattedDate() {

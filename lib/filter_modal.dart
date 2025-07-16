@@ -13,7 +13,7 @@ class FilterModal {
     String tempDate = currentDate;
     String tempType = currentType;
 
-    final localidades = ["Todos", "Centro", "Norte", "Sur"];
+    final localidades = [ "Todos","Norte", "Occidente", "Oriente", "Sur", "Noroccidente", "Nororiente", "Suroriente", "Suroccidente" ];
     final fechas = [
       "Todas",
       "2025-03-01",
@@ -22,7 +22,7 @@ class FilterModal {
       "2025-03-15",
       "2025-03-20",
     ];
-    final tipos = ["Todos", "Entretenimiento", "Parejas", "Amigos"];
+    final tipos = ["Todos", "Gastrobar","Discotecas","Cultural","Deportivo"];
 
     showModalBottomSheet(
       context: context,
